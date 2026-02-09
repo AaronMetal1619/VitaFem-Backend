@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Models;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -9,37 +9,28 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
+    protected $table = 'USUARIOS';
+    protected $primaryKey = 'ID_USUARIO';
+    public $timestamps = false;
+
+    // En Oracle tus columnas son mayúsculas
     protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'role',
-        'partner_type',   // viene de tu rama
-        'facebook_id',    // viene de la otra rama
-        'google_id',      // viene de la otra rama
-        'firebase_uid',   // viene de la otra rama
-        'photo'
+        'NOMBRE',
+        'CORREO',
+        'CONTRASEÑA', // Ojo: Laravel espera 'password', haremos un truco abajo
+        'ACTIVO',
     ];
 
     protected $hidden = [
-        'password',
-        'remember_token',
+        'CONTRASEÑA',
     ];
 
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-    ];
-
-    // Métodos helpers
-    public function isAdmin()
+    // Esto le dice a Laravel: "Cuando busques la contraseña del usuario,
+    // búscala en la columna 'CONTRASEÑA', no en 'password'"
+    public function getAuthPassword()
     {
-        return $this->role === 'admin';
-    }
-
-    public function isPartner()
-    {
-        return $this->role === 'partner';
+        return $this->CONTRASEÑA;
     }
 }
