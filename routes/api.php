@@ -6,6 +6,7 @@ use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
 
 // Controladores
+use App\Http\Controllers\PacienteController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProductoController;
@@ -133,3 +134,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // 🔐 FIREBASE LOGIN
 //
 Route::post('/auth/firebase', [FirebaseAuthController::class, 'handle']);
+
+// Ruta pública para probar (luego le pondremos seguridad)
+Route::get('/pacientes', [PacienteController::class, 'index']);
+Route::post('/pacientes', [PacienteController::class, 'store']);

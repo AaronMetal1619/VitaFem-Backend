@@ -2,76 +2,74 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ]);
-
-        if (!Auth::attempt($credentials)) {
-            return response()->json(['message' => 'Credenciales incorrectas'], 401);
-        }
-
-        $user = Auth::user();
-        
-        // Limpieza de tokens antiguos para evitar acumulación
-        $user->tokens()->delete();
-        
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login exitoso',
-            'token' => $token,
-            'user' => $user
-        ]);
-    }
-
+    // REGISTRO DE USUARIOS
     public function register(Request $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users'],
-            'password' => ['required', 'min:6'],
+        // 1. Validar lo que viene de React
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:100|unique:USUARIOS,CORREO',
+            'password' => 'required|string|min:6',
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => 'user',
-        ]);
+        // CHIVATO 1: Ver qué llega
+        Log::info('Intento de Login:', ['email' => $request->email]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // 2. Crear el Usuario en Oracle
+        // Mapeamos: React (minúsculas) -> Oracle (Mayúsculas)
+        $user = new User();
+        $user->NOMBRE = $request->name;
+        $user->CORREO = $request->email;
+        $user->PASSWORD = Hash::make($request->password);
+        $user->ACTIVO = '1'; // Por defecto activo
+        $user->save();
 
+        // 3. Crear Token (Simulado o Sanctum)
+        // Por simplicidad devolvemos el usuario, luego configuraremos Sanctum si lo necesitas
         return response()->json([
-            'message' => 'Registrado exitosamente',
-            'token' => $token,
-            'user' => $user
+            'message' => 'Usuario registrado',
+            'user' => $user,
+            'token' => 'token-demo-123' // Aquí iría el token real de Sanctum
         ], 201);
     }
 
-    public function logout(Request $request)
+    // LOGIN DE USUARIOS
+    // LOGIN DE USUARIOS
+    public function login(Request $request)
     {
-        $request->user()->tokens()->delete();
-        return response()->json(['message' => 'Sesión cerrada']);
-    }
+        // ... validaciones ...
 
-    public function me(Request $request)
-    {
-        return response()->json($request->user());
-    }
-    
-    // Dejamos este método por compatibilidad si alguna ruta vieja lo llama
-    public function createUserByAdmin(Request $request)
-    {
-        return app(UserController::class)->store($request);
+        // 1. Buscar usuario
+        // Aquí SÍ usamos mayúsculas en el WHERE porque es SQL directo hacia Oracle
+        $user = User::where('CORREO', $request->email)->first();
+
+        if (!$user) {
+            // ... error ...
+        }
+
+        // 2. Verificar contraseña
+        // CAMBIO AQUÍ: Usamos ->password (minúscula) porque así vino del driver
+        if (!Hash::check($request->password, $user->password)) {
+            Log::info('Fallo Login: Hash no coincide.');
+            return response()->json(['message' => 'Credenciales incorrectas'], 401);
+        }
+
+        // 3. Login exitoso
+        // Ocultamos ambos por si acaso
+        $user->makeHidden(['password', 'PASSWORD', 'CONTRASEÑA']);
+
+        return response()->json([
+            'message' => 'Login exitoso',
+            'user' => $user,
+            'token' => 'token-demo-123'
+        ]);
     }
 }

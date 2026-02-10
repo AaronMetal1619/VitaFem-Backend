@@ -11,6 +11,7 @@ class Paciente extends Model
 
     protected $table = 'PACIENTES';
     protected $primaryKey = 'ID_PACIENTE';
+    public $sequence = 'SEQ_PACIENTES';
     public $timestamps = false;
 
     protected $fillable = [

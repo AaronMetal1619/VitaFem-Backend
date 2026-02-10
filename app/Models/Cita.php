@@ -18,6 +18,7 @@ class Cita extends Model
     // 3. ¿Tu tabla tiene columnas created_at y updated_at?
     // En tu script SQL NO las vi, así que pon esto en false para que no de error.
     public $timestamps = false;
+    public $sequence = 'SEQ_CITAS'; // Si usas secuencia para el ID, indícala aquí
 
     // 4. Campos que se pueden llenar (Mass Assignment)
     protected $fillable = [

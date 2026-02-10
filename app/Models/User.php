@@ -13,24 +13,25 @@ class User extends Authenticatable
 
     protected $table = 'USUARIOS';
     protected $primaryKey = 'ID_USUARIO';
+    public $sequence = 'SEQ_USUARIOS';
     public $timestamps = false;
 
     // En Oracle tus columnas son mayúsculas
     protected $fillable = [
         'NOMBRE',
         'CORREO',
-        'CONTRASEÑA', // Ojo: Laravel espera 'password', haremos un truco abajo
+        'PASSWORD', // Ojo: Laravel espera 'password', haremos un truco abajo
         'ACTIVO',
     ];
 
     protected $hidden = [
-        'CONTRASEÑA',
+        'PASSWORD',
     ];
 
-    // Esto le dice a Laravel: "Cuando busques la contraseña del usuario,
-    // búscala en la columna 'CONTRASEÑA', no en 'password'"
+    // Esto le dice a Laravel: "Cuando busques la PASSWORD del usuario,
+    // búscala en la columna 'PASSWORD', no en 'password'"
     public function getAuthPassword()
     {
-        return $this->CONTRASEÑA;
+        return $this->password;
     }
 }
