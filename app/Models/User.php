@@ -22,6 +22,7 @@ class User extends Authenticatable
         'CORREO',
         'PASSWORD', // Ojo: Laravel espera 'password', haremos un truco abajo
         'ACTIVO',
+        'FOTO_PERFIL',
     ];
 
     protected $hidden = [

@@ -138,3 +138,6 @@ Route::post('/auth/firebase', [FirebaseAuthController::class, 'handle']);
 // Ruta pública para probar (luego le pondremos seguridad)
 Route::get('/pacientes', [PacienteController::class, 'index']);
 Route::post('/pacientes', [PacienteController::class, 'store']);
+Route::post('/pacientes/perfil', [PacienteController::class, 'updateProfile']);
+// Ruta para OBTENER el perfil (GET)
+Route::get('/pacientes/perfil/{id_usuario}', [PacienteController::class, 'getProfile']);
