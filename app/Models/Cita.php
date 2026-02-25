@@ -9,23 +9,36 @@ class Cita extends Model
 {
     use HasFactory;
 
-    // 1. Nombre exacto de la tabla en Oracle
     protected $table = 'CITAS';
-
-    // 2. Nombre de tu Clave Primaria (Primary Key)
-    protected $primaryKey = 'ID_CITAS';
-
-
+    protected $primaryKey = 'ID_CITAS'; // Con "S" al final
     public $timestamps = false;
     public $sequence = 'SEQ_CITAS';
 
-    // 4. Campos que se pueden llenar (Mass Assignment)
+    protected $casts = [
+        'FECHA_HORA' => 'datetime',
+    ];
+
     protected $fillable = [
         'ID_PACIENTE',
         'ID_MEDICO',
-        'FECHA_HORA_INICIO',
-        'FECHA_HORA_FIN',
+        'ID_USUARIO_REGISTRO',
+        'FECHA_HORA',
         'ESTADO',
-        'MOTIVO_VISITA'
+        'MOTIVO',
+        'NOTAS_MEDICAS'
     ];
+
+    // --- RELACIONES IMPORTANTES ---
+
+    // La cita pertenece a un médico
+    public function medico()
+    {
+        return $this->belongsTo(Medico::class, 'ID_MEDICO', 'ID_MEDICO');
+    }
+
+    // La cita pertenece a un paciente (Lo vinculamos con la tabla de Pacientes)
+    public function paciente()
+    {
+        return $this->belongsTo(Paciente::class, 'ID_PACIENTE', 'ID_PACIENTE');
+    }
 }

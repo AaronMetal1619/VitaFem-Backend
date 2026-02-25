@@ -141,3 +141,7 @@ Route::post('/pacientes', [PacienteController::class, 'store']);
 Route::post('/pacientes/perfil', [PacienteController::class, 'updateProfile']);
 // Ruta para OBTENER el perfil (GET)
 Route::get('/pacientes/perfil/{id_usuario}', [PacienteController::class, 'getProfile']);
+Route::get('/medicos', [CitaController::class, 'getMedicos']);
+Route::get('/horarios-disponibles', [CitaController::class, 'getHorariosDisponibles']); // <--- NUEVA
+Route::post('/citas', [CitaController::class, 'store']);
+Route::get('/pacientes/{id_usuario}/citas', [CitaController::class, 'getMisCitas']);
