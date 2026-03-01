@@ -145,3 +145,13 @@ Route::get('/medicos', [CitaController::class, 'getMedicos']);
 Route::get('/horarios-disponibles', [CitaController::class, 'getHorariosDisponibles']); // <--- NUEVA
 Route::post('/citas', [CitaController::class, 'store']);
 Route::get('/pacientes/{id_usuario}/citas', [CitaController::class, 'getMisCitas']);
+// --- RUTAS DEL ADMINISTRADOR / SECRETARIA ---
+Route::get('/admin/citas', [CitaController::class, 'getAllCitas']);
+Route::put('/admin/citas/{id}/estado', [CitaController::class, 'updateEstado']);
+Route::post('/admin/medicos', [CitaController::class, 'crearMedico']);
+// --- RUTAS DEL MÉDICO ---
+Route::get('/medico/{id_usuario}/citas', [CitaController::class, 'getCitasMedico']);
+Route::put('/medico/citas/{id}/atender', [CitaController::class, 'atenderCita']);
+Route::get('/medico/{id_usuario}/horarios', [CitaController::class, 'getHorarios']);
+Route::put('/medico/{id_usuario}/horarios', [CitaController::class, 'updateHorarios']);
+

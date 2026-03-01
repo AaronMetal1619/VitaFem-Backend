@@ -12,8 +12,10 @@ class Medico extends Model
     protected $table = 'MEDICO';
     protected $primaryKey = 'ID_MEDICO';
     public $timestamps = false;
-    // Si usaste una secuencia para médicos, agrégala (opcional pero recomendado)
-    // public $sequence = 'SEQ_MEDICOS';
+
+    // --- ESTA ES LA LÍNEA MÁGICA QUE FALTABA ---
+    public $sequence = 'SEQ_MEDICOS';
+    // ------------------------------------------
 
     protected $fillable = [
         'ID_USUARIO',
@@ -22,14 +24,11 @@ class Medico extends Model
         'BIO'
     ];
 
-    // --- ¡ESTA ES LA MAGIA QUE FALTABA! ---
-    // Le dice a Laravel que un Médico tiene un Usuario (Login) asociado
     public function usuario()
     {
         return $this->belongsTo(User::class, 'ID_USUARIO', 'ID_USUARIO');
     }
 
-    // Le dice a Laravel que un Médico tiene muchos Horarios
     public function horarios()
     {
         return $this->hasMany(HorarioMedico::class, 'ID_MEDICO', 'ID_MEDICO');
