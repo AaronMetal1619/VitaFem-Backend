@@ -12,6 +12,9 @@ use App\Models\Cita;
 use App\Models\HorarioMedico;
 use App\Models\Medico;
 use App\Models\Paciente;
+use App\Models\Consulta;
+use App\Models\Receta;
+use App\Models\DetalleReceta;
 
 class CitaController extends Controller
 {
@@ -146,28 +149,65 @@ class CitaController extends Controller
     public function getMisCitas($id_usuario)
     {
         try {
-            // Buscamos las citas de este paciente, trayendo también la info del médico
+            // Traemos las citas del paciente
             $citas = Cita::with(['medico.usuario'])
                          ->where('ID_PACIENTE', $id_usuario)
-                         ->orderBy('FECHA_HORA', 'asc') // Ordenar por fecha, las más próximas primero
+                         ->orderBy('FECHA_HORA', 'desc')
                          ->get();
 
             $data = $citas->map(function($cita) {
-                // Truco para las mayúsculas/minúsculas de Oracle
+                // 1. Fechas
                 $fechaHoraStr = $cita->FECHA_HORA ?? $cita->fecha_hora;
                 $fechaObj = Carbon::parse($fechaHoraStr);
 
+                // 2. Médico
                 $medicoUser = $cita->medico->usuario ?? null;
                 $nombreMedico = $medicoUser ? ($medicoUser->NOMBRE ?? $medicoUser->nombre) : 'Especialista';
 
+                // --- 3. BÚSQUEDA MANUAL DE LA CONSULTA (A PRUEBA DE ORACLE) ---
+                $consultaData = null;
+                $idCitaReal = $cita->ID_CITAS ?? $cita->id_citas;
+
+                // Buscamos la consulta que pertenezca a esta cita
+                $consulta = \App\Models\Consulta::where('ID_CITAS', $idCitaReal)->orWhere('id_citas', $idCitaReal)->first();
+
+                if ($consulta) {
+                    $detalles = [];
+                    $idConsultaReal = $consulta->ID_CONSULTA ?? $consulta->id_consulta;
+
+                    // Buscamos la receta de esta consulta
+                    $receta = \App\Models\Receta::where('ID_CONSULTA', $idConsultaReal)->orWhere('id_consulta', $idConsultaReal)->first();
+
+                    if ($receta) {
+                        $idRecetaReal = $receta->ID_RECETA ?? $receta->id_receta;
+                        // Buscamos los medicamentos
+                        $medicamentos = \App\Models\DetalleReceta::where('ID_RECETA', $idRecetaReal)->orWhere('id_receta', $idRecetaReal)->get();
+
+                        foreach ($medicamentos as $med) {
+                            $detalles[] = [
+                                'medicamento' => $med->MEDICAMENTO ?? $med->medicamento,
+                                'dosis' => $med->DOSIS ?? $med->dosis,
+                                'frecuencia' => $med->FRECUENCIA ?? $med->frecuencia,
+                                'duracion' => $med->DURACION ?? $med->duracion,
+                            ];
+                        }
+                    }
+
+                    $consultaData = [
+                        'diagnostico' => $consulta->DIAGNOSTICO ?? $consulta->diagnostico,
+                        'indicaciones' => $consulta->TRATAMIENTO_INDICACIONES ?? $consulta->tratamiento_indicaciones,
+                        'medicamentos' => $detalles
+                    ];
+                }
+
                 return [
-                    'id_cita' => $cita->ID_CITAS ?? $cita->id_citas,
-                    'fecha' => $fechaObj->format('Y-m-d'), // Para validaciones si quieres
-                    'fecha_formateada' => $fechaObj->format('d/m/Y'), // "25/03/2026"
-                    'hora' => $fechaObj->format('H:i'), // "09:00"
+                    'id_cita' => $idCitaReal,
+                    'fecha_formateada' => $fechaObj->format('d/m/Y'),
+                    'hora' => $fechaObj->format('H:i'),
                     'medico' => $nombreMedico,
                     'estado' => $cita->ESTADO ?? $cita->estado,
                     'motivo' => $cita->MOTIVO ?? $cita->motivo,
+                    'consulta_medica' => $consultaData // ¡Ahora sí viajará seguro a React!
                 ];
             });
 
@@ -200,8 +240,25 @@ class CitaController extends Controller
                 $nombreMedico = $medicoUser ? ($medicoUser->NOMBRE ?? $medicoUser->nombre) : 'Doctor';
 
                 // Paciente
-                $paciente = $cita->paciente ?? null;
-                $nombrePaciente = $paciente ? ($paciente->NOMBRE_COMPLETO ?? $paciente->nombre_completo) : 'Paciente Sin Nombre';
+               // --- TRUCO INFALIBLE PARA EL PACIENTE ---
+                $idPaciente = $cita->ID_PACIENTE ?? $cita->id_paciente;
+
+                // 1. Buscamos en la tabla Pacientes
+                $paciente = \App\Models\Paciente::where('ID_PACIENTE', $idPaciente)->orWhere('id_paciente', $idPaciente)->first();
+
+                $nombrePaciente = 'Paciente Sin Nombre';
+
+                if ($paciente && ($paciente->NOMBRE_COMPLETO ?? $paciente->nombre_completo)) {
+                    // Si ya llenó su perfil, usamos el nombre del perfil
+                    $nombrePaciente = $paciente->NOMBRE_COMPLETO ?? $paciente->nombre_completo;
+                } else {
+                    // 2. Si NO ha llenado su perfil, vamos directo a la tabla USUARIOS usando el ID_PACIENTE
+                    // (Porque recuerda que el ID_PACIENTE es el mismo que el ID_USUARIO cuando se registran)
+                    $usuarioPac = \App\Models\User::where('ID_USUARIO', $idPaciente)->orWhere('id_usuario', $idPaciente)->first();
+                    if ($usuarioPac) {
+                        $nombrePaciente = $usuarioPac->NOMBRE ?? $usuarioPac->nombre;
+                    }
+                }
 
                 return [
                     'id_cita' => $cita->ID_CITAS ?? $cita->id_citas,
@@ -285,7 +342,25 @@ class CitaController extends Controller
 
                 // Paciente
                 $paciente = $cita->paciente ?? null;
-                $nombrePaciente = $paciente ? ($paciente->NOMBRE_COMPLETO ?? $paciente->nombre_completo) : 'Paciente Sin Nombre';
+                // --- TRUCO INFALIBLE PARA EL PACIENTE ---
+                $idPaciente = $cita->ID_PACIENTE ?? $cita->id_paciente;
+
+                // 1. Buscamos en la tabla Pacientes
+                $paciente = \App\Models\Paciente::where('ID_PACIENTE', $idPaciente)->orWhere('id_paciente', $idPaciente)->first();
+
+                $nombrePaciente = 'Paciente Sin Nombre';
+
+                if ($paciente && ($paciente->NOMBRE_COMPLETO ?? $paciente->nombre_completo)) {
+                    // Si ya llenó su perfil, usamos el nombre del perfil
+                    $nombrePaciente = $paciente->NOMBRE_COMPLETO ?? $paciente->nombre_completo;
+                } else {
+                    // 2. Si NO ha llenado su perfil, vamos directo a la tabla USUARIOS usando el ID_PACIENTE
+                    // (Porque recuerda que el ID_PACIENTE es el mismo que el ID_USUARIO cuando se registran)
+                    $usuarioPac = \App\Models\User::where('ID_USUARIO', $idPaciente)->orWhere('id_usuario', $idPaciente)->first();
+                    if ($usuarioPac) {
+                        $nombrePaciente = $usuarioPac->NOMBRE ?? $usuarioPac->nombre;
+                    }
+                }
 
                 return [
                     'id_cita' => $cita->ID_CITAS ?? $cita->id_citas,
@@ -305,27 +380,67 @@ class CitaController extends Controller
         }
     }
 
-    // PUT: /api/medico/citas/{id}/atender
+   // PUT: /api/medico/citas/{id}/atender
     public function atenderCita(Request $request, $id)
     {
         try {
-            // Validamos que el médico mande sus notas
-            $request->validate([
-                'notas_medicas' => 'required|string'
+            DB::beginTransaction();
+
+            // 1. Obtener la cita para saber a qué paciente pertenece
+            $cita = Cita::where('ID_CITAS', $id)->orWhere('id_citas', $id)->first();
+            if (!$cita) {
+                return response()->json(['error' => 'Cita no encontrada'], 404);
+            }
+
+            // 2. Crear el expediente de la CONSULTA
+            $consulta = new Consulta();
+            $consulta->ID_CITAS = $cita->ID_CITAS ?? $cita->id_citas;
+            $consulta->ID_PACIENTE = $cita->ID_PACIENTE ?? $cita->id_paciente;
+            $consulta->PESO = $request->peso;
+            $consulta->ALTURA = $request->altura;
+            $consulta->TEMPERATURA = $request->temperatura;
+            $consulta->PRESION_ARTERIAL = $request->presion_arterial;
+            $consulta->SINTOMAS_SUBJETIVOS = $request->sintomas;
+            $consulta->EXPLORACION_FISICA = $request->exploracion;
+            $consulta->DIAGNOSTICO = $request->diagnostico;
+            $consulta->TRATAMIENTO_INDICACIONES = $request->indicaciones;
+            $consulta->save();
+
+            // 3. Crear RECETA y DETALLES (Solo si el doctor agregó medicamentos)
+            if ($request->has('medicamentos') && is_array($request->medicamentos) && count($request->medicamentos) > 0) {
+
+                // Creamos el encabezado de la receta
+                $receta = new Receta();
+                $receta->ID_CONSULTA = $consulta->ID_CONSULTA ?? $consulta->id_consulta;
+                $receta->FECHA = Carbon::now();
+                $receta->save();
+
+                // Guardamos cada medicamento en la tabla Detalle
+                foreach ($request->medicamentos as $med) {
+                    $detalle = new DetalleReceta();
+                    $detalle->ID_RECETA = $receta->ID_RECETA ?? $receta->id_receta;
+                    $detalle->MEDICAMENTO = $med['medicamento'];
+                    $detalle->DOSIS = $med['dosis'];
+                    $detalle->FRECUENCIA = $med['frecuencia'];
+                    $detalle->DURACION = $med['duracion'];
+                    $detalle->save();
+                }
+            }
+
+            // 4. Actualizar la Cita original a FINALIZADA
+            // Guardamos un resumen en "NOTAS_MEDICAS" para la vista rápida de la tarjeta
+            $resumenRapido = "Diagnóstico: " . $request->diagnostico;
+            Cita::where('ID_CITAS', $id)->orWhere('id_citas', $id)->update([
+                'NOTAS_MEDICAS' => $resumenRapido,
+                'ESTADO' => 'FINALIZADA'
             ]);
 
-            // Actualizamos la cita: Guardamos las notas y la marcamos como FINALIZADA
-            Cita::where('ID_CITAS', $id)
-                ->orWhere('id_citas', $id)
-                ->update([
-                    'NOTAS_MEDICAS' => $request->notas_medicas,
-                    'ESTADO' => 'FINALIZADA'
-                ]);
-
-            return response()->json(['message' => 'Cita atendida y finalizada correctamente']);
+            DB::commit();
+            return response()->json(['message' => 'Consulta médica guardada exitosamente']);
 
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al guardar notas médicas: ' . $e->getMessage()], 500);
+            DB::rollBack();
+            return response()->json(['error' => 'Error al guardar el expediente clínico: ' . $e->getMessage()], 500);
         }
     }
     // POST: /api/admin/medicos

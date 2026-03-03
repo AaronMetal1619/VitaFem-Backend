@@ -41,4 +41,10 @@ class Cita extends Model
     {
         return $this->belongsTo(Paciente::class, 'ID_PACIENTE', 'ID_PACIENTE');
     }
+    // --- NUEVA RELACIÓN ---
+    // Una Cita tiene una Consulta Médica
+    public function consulta()
+    {
+        return $this->hasOne(Consulta::class, 'ID_CITAS', 'ID_CITAS');
+    }
 }
