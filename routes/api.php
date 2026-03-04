@@ -154,4 +154,5 @@ Route::get('/medico/{id_usuario}/citas', [CitaController::class, 'getCitasMedico
 Route::put('/medico/citas/{id}/atender', [CitaController::class, 'atenderCita']);
 Route::get('/medico/{id_usuario}/horarios', [CitaController::class, 'getHorarios']);
 Route::put('/medico/{id_usuario}/horarios', [CitaController::class, 'updateHorarios']);
+Route::get('/medico/paciente/{id_paciente}/historial', [CitaController::class, 'getHistorialPaciente']);
 

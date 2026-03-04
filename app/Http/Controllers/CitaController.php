@@ -364,6 +364,7 @@ class CitaController extends Controller
 
                 return [
                     'id_cita' => $cita->ID_CITAS ?? $cita->id_citas,
+                    'id_paciente' => $idPaciente,
                     'paciente' => $nombrePaciente,
                     'fecha_formateada' => $fechaObj->format('d/m/Y'),
                     'hora' => $fechaObj->format('H:i'),
@@ -568,6 +569,81 @@ class CitaController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => 'Error al actualizar horarios: ' . $e->getMessage()], 500);
+        }
+    }
+    // GET: /api/medico/paciente/{id_paciente}/historial
+    public function getHistorialPaciente($id_paciente)
+    {
+        try {
+            // Buscamos todas las citas finalizadas de este paciente
+            $citas = Cita::where('ID_PACIENTE', $id_paciente)
+                         ->where('ESTADO', 'FINALIZADA')
+                         ->orderBy('FECHA_HORA', 'desc')
+                         ->get();
+
+            $data = $citas->map(function($cita) {
+                $fechaHoraStr = $cita->FECHA_HORA ?? $cita->fecha_hora;
+                $fechaObj = Carbon::parse($fechaHoraStr);
+
+                // --- TRUCO INFALIBLE PARA EL NOMBRE DEL MÉDICO ---
+                $idMedicoReal = $cita->ID_MEDICO ?? $cita->id_medico;
+                $medico = \App\Models\Medico::where('ID_MEDICO', $idMedicoReal)->orWhere('id_medico', $idMedicoReal)->first();
+                $nombreMedico = 'Doctor Especialista'; // Valor por defecto
+
+                if ($medico) {
+                    $idUsuarioMedico = $medico->ID_USUARIO ?? $medico->id_usuario;
+                    $usuarioMedico = \App\Models\User::where('ID_USUARIO', $idUsuarioMedico)->orWhere('id_usuario', $idUsuarioMedico)->first();
+                    if ($usuarioMedico) {
+                        // Concatenamos "Dr. " para que se vea genial en el historial
+                        $nombreMedico = 'Dr. ' . ($usuarioMedico->NOMBRE ?? $usuarioMedico->nombre);
+                    }
+                }
+
+                // Extracción manual segura para Oracle (Consulta y Receta)
+                $consultaData = null;
+                $idCitaReal = $cita->ID_CITAS ?? $cita->id_citas;
+                $consulta = \App\Models\Consulta::where('ID_CITAS', $idCitaReal)->orWhere('id_citas', $idCitaReal)->first();
+
+                if ($consulta) {
+                    $detalles = [];
+                    $idConsultaReal = $consulta->ID_CONSULTA ?? $consulta->id_consulta;
+                    $receta = \App\Models\Receta::where('ID_CONSULTA', $idConsultaReal)->orWhere('id_consulta', $idConsultaReal)->first();
+
+                    if ($receta) {
+                        $idRecetaReal = $receta->ID_RECETA ?? $receta->id_receta;
+                        $medicamentos = \App\Models\DetalleReceta::where('ID_RECETA', $idRecetaReal)->orWhere('id_receta', $idRecetaReal)->get();
+
+                        foreach ($medicamentos as $med) {
+                            $detalles[] = [
+                                'medicamento' => $med->MEDICAMENTO ?? $med->medicamento,
+                                'dosis' => $med->DOSIS ?? $med->dosis,
+                                'frecuencia' => $med->FRECUENCIA ?? $med->frecuencia,
+                                'duracion' => $med->DURACION ?? $med->duracion,
+                            ];
+                        }
+                    }
+
+                    $consultaData = [
+                        'peso' => $consulta->PESO ?? $consulta->peso,
+                        'presion' => $consulta->PRESION_ARTERIAL ?? $consulta->presion_arterial,
+                        'diagnostico' => $consulta->DIAGNOSTICO ?? $consulta->diagnostico,
+                        'indicaciones' => $consulta->TRATAMIENTO_INDICACIONES ?? $consulta->tratamiento_indicaciones,
+                        'medicamentos' => $detalles
+                    ];
+                }
+
+                return [
+                    'fecha_formateada' => $fechaObj->format('d/m/Y'),
+                    'medico' => $nombreMedico, // ¡Aquí viaja el nombre arreglado!
+                    'motivo' => $cita->MOTIVO ?? $cita->motivo,
+                    'consulta_medica' => $consultaData
+                ];
+            });
+
+            return response()->json($data);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al obtener historial: ' . $e->getMessage()], 500);
         }
     }
 }
