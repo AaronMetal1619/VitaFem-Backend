@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\CitaConfirmada;
 
 use App\Models\User;
 use App\Models\Cita;
@@ -111,30 +113,60 @@ class CitaController extends Controller
     // POST: /api/citas
     public function store(Request $request)
     {
-        // 1. Validar que React nos mandó todo lo necesario
         $request->validate([
             'ID_PACIENTE' => 'required',
             'ID_MEDICO' => 'required',
             'FECHA' => 'required|date',
-            'HORA' => 'required', // Ej: "09:00"
+            'HORA' => 'required',
         ]);
 
         try {
-            // 2. Unir la fecha y la hora para Oracle (Que usa tipo DATE con hora incluida)
-            // Transformamos "2026-03-15" y "09:00" en "2026-03-15 09:00:00"
             $fechaHoraString = $request->FECHA . ' ' . $request->HORA . ':00';
             $fechaHora = Carbon::parse($fechaHoraString);
 
-            // 3. Crear la Cita
             $cita = new Cita();
             $cita->ID_PACIENTE = $request->ID_PACIENTE;
             $cita->ID_MEDICO = $request->ID_MEDICO;
-            $cita->ID_USUARIO_REGISTRO = $request->ID_USUARIO_REGISTRO; // Quien la agendó
+            $cita->ID_USUARIO_REGISTRO = $request->ID_USUARIO_REGISTRO;
             $cita->FECHA_HORA = $fechaHora;
             $cita->MOTIVO = $request->MOTIVO;
-            $cita->ESTADO = 'PENDIENTE'; // Todas nacen pendientes
-
+            $cita->ESTADO = 'PENDIENTE';
             $cita->save();
+
+            // ==========================================
+            // MAGIA DE CORREOS AQUÍ ✉️✨
+            // ==========================================
+            if ($request->has('enviar_correo') && $request->enviar_correo == true && $request->correo_notificacion) {
+                try {
+                    // Buscamos el nombre del doctor para ponerlo en el correo
+                    $medico = Medico::where('ID_MEDICO', $request->ID_MEDICO)->orWhere('id_medico', $request->ID_MEDICO)->first();
+                    $nombreMedico = 'Especialista';
+                    if ($medico) {
+                        $idUsuarioMed = $medico->ID_USUARIO ?? $medico->id_usuario;
+                        $userMed = User::where('ID_USUARIO', $idUsuarioMed)->orWhere('id_usuario', $idUsuarioMed)->first();
+                        if ($userMed) {
+                            $nombreMedico = 'Dr. ' . ($userMed->NOMBRE ?? $userMed->nombre);
+                        }
+                    }
+
+                    // Empaquetamos los datos
+                    $datosCorreo = [
+                        'medico_nombre' => $nombreMedico,
+                        'fecha' => Carbon::parse($request->FECHA)->format('d/m/Y'),
+                        'hora' => $request->HORA,
+                        'motivo' => $request->MOTIVO
+                    ];
+
+                    // ¡Disparamos el correo!
+                    Mail::to($request->correo_notificacion)->send(new CitaConfirmada($datosCorreo));
+
+                } catch (\Exception $mailError) {
+                    // Si el correo falla, guardamos el error en silencio (en storage/logs/laravel.log)
+                    // pero dejamos que la cita se guarde correctamente.
+                    \Log::error('Error enviando correo de cita: ' . $mailError->getMessage());
+                }
+            }
+            // ==========================================
 
             return response()->json([
                 'message' => 'Cita guardada correctamente',
