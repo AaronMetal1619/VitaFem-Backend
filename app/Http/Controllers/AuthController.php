@@ -32,44 +32,47 @@ class AuthController extends Controller
         $user->ACTIVO = '1'; // Por defecto activo
         $user->save();
 
-        // 3. Crear Token (Simulado o Sanctum)
-        // Por simplicidad devolvemos el usuario, luego configuraremos Sanctum si lo necesitas
         return response()->json([
             'message' => 'Usuario registrado',
-            'user' => $user,
-            'token' => 'token-demo-123' // Aquí iría el token real de Sanctum
+            'usuario' => $user,
+            'access_token' => 'token-demo-123' // Aquí iría el token real de Sanctum
         ], 201);
     }
 
     // LOGIN DE USUARIOS
-    // LOGIN DE USUARIOS
     public function login(Request $request)
     {
-        // ... validaciones ...
+        // 0. Recibimos el correo (Soporta si el Front envía 'correo' o 'email')
+        $correoRecibido = $request->correo ?? $request->email;
 
-        // 1. Buscar usuario
-        // Aquí SÍ usamos mayúsculas en el WHERE porque es SQL directo hacia Oracle
-        $user = User::where('CORREO', $request->email)->first();
+        // 1. Buscar usuario (Soportando mayúsculas y minúsculas de Oracle)
+        $user = User::where('CORREO', $correoRecibido)
+                    ->orWhere('correo', $correoRecibido)
+                    ->first();
 
+        // 2. ¡EL ESCUDO! Si no existe, DEBEMOS detener la ejecución con un return
         if (!$user) {
-            // ... error ...
+            Log::warning('Fallo Login: Correo no encontrado - ' . $correoRecibido);
+            return response()->json(['message' => 'Correo no encontrado en el sistema'], 401);
         }
 
-        // 2. Verificar contraseña
-        // CAMBIO AQUÍ: Usamos ->password (minúscula) porque así vino del driver
-        if (!Hash::check($request->password, $user->password)) {
-            Log::info('Fallo Login: Hash no coincide.');
-            return response()->json(['message' => 'Credenciales incorrectas'], 401);
+        // 3. Verificar contraseña (Cubriendo Oracle)
+        $passwordDB = $user->PASSWORD ?? $user->password;
+
+        if (!Hash::check($request->password, $passwordDB)) {
+            Log::info('Fallo Login: Hash no coincide para - ' . $correoRecibido);
+            return response()->json(['message' => 'Contraseña incorrecta'], 401);
         }
 
-        // 3. Login exitoso
-        // Ocultamos ambos por si acaso
+        // 4. Login exitoso
+        // Ocultamos las contraseñas para que no viajen al celular por seguridad
         $user->makeHidden(['password', 'PASSWORD', 'CONTRASEÑA']);
 
+        // IMPORTANTE: Devolvemos 'usuario' y 'access_token' porque así los espera React Native
         return response()->json([
             'message' => 'Login exitoso',
-            'user' => $user,
-            'token' => 'token-demo-123'
+            'usuario' => $user,
+            'access_token' => 'token-demo-123'
         ]);
     }
 }
